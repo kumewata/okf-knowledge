@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "okf-knowledge"
-version = "1.0.3"
+version = "1.0.4"
 source = { virtual = "." }
 
 [package.dev-dependencies]

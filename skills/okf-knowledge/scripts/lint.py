@@ -88,6 +88,20 @@ def check_concept(c: _okf.Concept, bundle: Path, conv: _okf.Conventions) -> list
     return out
 
 
+def check_version(bundle: Path) -> list[Finding]:
+    """OKF012: the bundle declares an okf_version these rules were not written for (§12)."""
+    index = bundle / "index.md"
+    if not index.exists():
+        return []
+    fm, _, _ = _okf.parse_document(_okf.read_text(index))
+    version = (fm or {}).get("okf_version")
+    if version is None or str(version) in _okf.SUPPORTED_OKF_VERSIONS:
+        return []
+    return [Finding("OKF012", "warning", index,
+                    f"okf_version `{version}` is not one these rules check "
+                    f"({', '.join(_okf.SUPPORTED_OKF_VERSIONS)}); findings may be wrong or missing")]
+
+
 def check_indexes(bundle: Path) -> list[Finding]:
     out = []
     for path in sorted(p for p in bundle.rglob("index.md") if not _okf.is_hidden(p, bundle)):
@@ -267,8 +281,13 @@ def lint(bundle: Path, base: str | None = None, conventions_text: str | None = N
     for c in _okf.load_concepts(bundle):
         findings += check_concept(c, bundle, conv)
     findings += check_indexes(bundle)
+    findings += check_version(bundle)
     if base:
         findings += check_history(bundle, base, conv, attestations)
+    strict = set(conv.data["lint"]["strict"])
+    for f in findings:
+        if f.rule in strict:
+            f.level = "error"  # lint.strict only raises levels, never lowers them
     return findings
 
 

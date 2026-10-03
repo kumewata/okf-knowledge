@@ -32,8 +32,23 @@ Ask Claude Code to "set up an OKF knowledge bundle", or by hand:
 `knowledge/` is only the default: put the bundle in any directory and change `paths` and `bundle` in the workflows to match.
 A repository can hold several bundles, each with its own `CONVENTIONS.md`; add one job per bundle to each workflow, list every bundle directory in okf-lint's `paths`, give each okf-status job its own `label`, and name the paths of one bundle per `/okf verify` comment.
 
-The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.3` pins both.
+The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.4` pins both.
 Release tags (`v1.0.0`, `v1.0.1`, …) are never moved; a fix ships as a new tag. Do not use the `v1` tag: it points at a pre-release commit with a known bug.
+
+## Protect the default branch
+
+Lint checks what a pull request adds, so it only protects what reaches the default branch through pull requests.
+Set up a branch protection rule or ruleset for the default branch:
+
+- **Require a pull request before merging**, so that nobody pushes `human:` entries or convention changes straight to the branch.
+- **Require status checks to pass**, and add each okf-lint job. The check is named `<caller job> / lint`, such as `okf-lint / lint` (and `okf-lint-ops / lint` for a second bundle).
+- **Require review from Code Owners**, with a `CODEOWNERS` entry for each bundle's conventions, so that the rules lint and verify apply cannot change without the owners:
+
+  ```
+  /knowledge/CONVENTIONS.md @your-org/knowledge-owners
+  ```
+
+With okf-lint required and no GitHub App, every `/okf verify` also needs a maintainer to approve the lint run on the bot's commit (see below).
 
 ## How verification works
 
@@ -67,7 +82,7 @@ To avoid that, install a GitHub App with `contents: write` and `pull-requests: w
 
 | Script | Purpose |
 | --- | --- |
-| `lint.py <bundle> [--base <ref>] [--format text\|github]` | Spec conformance and team rules, OKF001–OKF011 |
+| `lint.py <bundle> [--base <ref>] [--format text\|github]` | Spec conformance and team rules, OKF001–OKF012 |
 | `index.py <bundle> [--check]` | Generate or check `index.md` files (§8) |
 | `status.py <bundle> [--now <iso>] [--format md\|json] [--link-prefix <url>]` | Concepts that need attention (the conventions file is not listed) |
 | `verify.py <bundle> <path>... --by human:<id> --at <iso>` | Append a verification (used by the workflow) |
@@ -87,6 +102,14 @@ uv run pytest
 actionlint
 claude plugin validate .
 ```
+
+The agent's behavior is checked with `claude plugin eval` (cases in `evals/`; each scaffolds a small bundle and grades the files the agent leaves):
+
+```sh
+claude plugin eval . --scaffold --ablation none --allow-tools Write Edit Bash
+```
+
+The eval sandbox has no network, so `uv run` cannot fetch PyYAML there and the agent cannot run lint; the graders check the files directly.
 
 ## License
 

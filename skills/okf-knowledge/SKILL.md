@@ -1,6 +1,6 @@
 ---
 name: okf-knowledge
-description: Use when writing, updating, reading, or maintaining team knowledge kept as an Open Knowledge Format (OKF) v0.2 bundle in a repository: a directory (`knowledge/` by default) whose `CONVENTIONS.md` has `type: OKF Conventions`. Covers runbooks, ADRs, table and metric definitions, glossary entries, references and notes; asking a person to verify knowledge; finding stale or unverified knowledge; regenerating `index.md`; fixing lint findings named OKF001–OKF011; and setting up a new bundle. Do NOT use for documentation that lives outside the bundle.
+description: Use when writing, updating, reading, or maintaining team knowledge kept as an Open Knowledge Format (OKF) v0.2 bundle in a repository: a directory (`knowledge/` by default) whose `CONVENTIONS.md` has `type: OKF Conventions`. Covers runbooks, ADRs, table and metric definitions, glossary entries, references and notes; asking a person to verify knowledge; finding stale or unverified knowledge; regenerating `index.md`; fixing lint findings named OKF001–OKF012; and setting up a new bundle. Do NOT use for documentation that lives outside the bundle.
 ---
 
 # okf-knowledge
@@ -25,7 +25,7 @@ If there is no bundle and the user wants one, see "Set up a bundle".
 1. **Never add a `human:` entry to `verified`.** Only the okf-verify workflow writes those, from a person's `/okf verify` comment, and CI rejects any entry that does not match such a comment (OKF006). You may not verify on a person's behalf, even if asked; tell them how to do it instead.
 2. When you create or change a concept's content, set `generated: { by: claude-code/<your model ID>, at: <now> }`. Leave `generated` alone when you change nothing but `verified`.
 3. Every timestamp is an ISO 8601 datetime with an offset. Get the current time with `date -u +%Y-%m-%dT%H:%M:%SZ`.
-4. Set `stale_after` on every new concept: now plus the type's `stale_after_days`.
+4. Set `stale_after` on every new concept: now plus the type's `stale_after_days`. Compute it with the command below before writing the file; do not type the date by hand.
    `python3 -c "from datetime import *; print((datetime.now(timezone.utc)+timedelta(days=180)).strftime('%Y-%m-%dT%H:%M:%SZ'))"`
 5. Paths in frontmatter (`resource`, `sources[].resource`) are URLs or bundle paths starting with `/`. Never `policies/x.md` or `../x.md`.
 6. Record where a claim came from: add a `sources` entry with an `id`, and cite it with a footnote whose label is that id (`[^id]`).
@@ -80,6 +80,7 @@ For each one, propose one of:
 4. Copy the workflows in `<skill-dir>/templates/github/` to `.github/workflows/`, and set `bundle: <bundle>` in each, plus `paths: ["<bundle>/**"]` in okf-lint. Leave the `uses:` lines as they are.
    If the repository already has okf workflows for another bundle, add a job per bundle to them instead: add `"<bundle>/**"` to okf-lint's `paths` list (it filters the whole workflow), and give the new okf-status job its own `label`.
 5. Add a line to the repository's `CLAUDE.md`: knowledge lives in `<bundle>/`; start from `<bundle>/index.md`.
+6. Tell the user what to set in GitHub, which you cannot do from here: protect the default branch (pull requests required; the okf-lint job `<job> / lint` as a required check; Code Owners review), add `/<bundle>/CONVENTIONS.md` to `CODEOWNERS`, and optionally a GitHub App for okf-verify. The README's "Protect the default branch" section has the details.
 
 ## References
 

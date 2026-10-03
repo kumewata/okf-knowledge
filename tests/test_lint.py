@@ -268,3 +268,24 @@ def test_bom_and_invalid_utf8(bundle):
     (b / "latin1.md").write_bytes(b"---\ntype: Caf\xe9\n---\n")
     found = {(f.path.name, f.rule) for f in lint.lint(b)}
     assert found == {("latin1.md", "OKF001")}
+
+
+def test_okf012_unknown_okf_version(bundle):
+    assert lint.lint(bundle({"index.md": '---\nokf_version: "0.2"\n---\n'})) == []
+    assert lint.lint(bundle({"index.md": "# no frontmatter\n"})) == []
+    found = lint.lint(bundle({"index.md": '---\nokf_version: "0.3"\n---\n'}))
+    assert [(f.rule, f.level) for f in found] == [("OKF012", "warning")]
+
+
+def test_lint_strict_raises_warnings_to_errors(bundle):
+    conv = "---\ntype: OKF Conventions\nokf_conventions:\n  lint: { strict: [OKF007, OKF009] }\n---\n"
+    concept = ("---\ntype: Wiki\ngenerated: { by: human:a, at: 2026-07-01T00:00:00Z }\n"
+               "verified: { by: human:b, at: 2026-06-01T00:00:00Z }\n---\n")
+    found = {(f.rule, f.level) for f in lint.lint(bundle({"CONVENTIONS.md": conv, "a.md": concept}))}
+    assert found == {("OKF007", "error"), ("OKF009", "error")}
+
+
+def test_lint_strict_rejects_unknown_rules(bundle):
+    conv = "---\ntype: OKF Conventions\nokf_conventions:\n  lint: { strict: [OKF999] }\n---\n"
+    found = lint.lint(bundle({"CONVENTIONS.md": conv}))
+    assert [(f.rule, f.level) for f in found] == [("CONV", "warning")]

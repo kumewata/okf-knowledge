@@ -53,9 +53,27 @@ okf-status の job には、それぞれ別の `label` を付けます。
 `/okf verify` のコメントには、1 つの bundle のパスだけを書いてください。
 
 コピーしたワークフローは、このリポジトリの再利用ワークフローを呼びます。
-再利用ワークフローはスクリプトを自分と同じコミットで checkout するので、`@v1.0.3` と指定すれば両方が固定されます。
+再利用ワークフローはスクリプトを自分と同じコミットで checkout するので、`@v1.0.4` と指定すれば両方が固定されます。
 リリースタグ（`v1.0.0`、`v1.0.1` など）は一度付けたら動かさず、修正は新しいタグで出します。
 `v1` タグは使わないでください。既知の不具合があるリリース前のコミットを指しています。
+
+## 既定ブランチの保護
+
+lint が検査するのは PR で追加された差分なので、守れるのは PR を通って既定ブランチに入る変更だけです。
+既定ブランチに、ブランチ保護ルールか ruleset を設定してください。
+
+- **マージ前に PR を必須にする。**
+  `human:` の行や規約の変更が、PR を通らずに直接 push されるのを防ぎます。
+- **ステータスチェックの成功を必須にし、okf-lint の各 job を指定する。**
+  チェック名は `<呼び出し側の job 名> / lint` で、たとえば `okf-lint / lint` です（2 つ目の bundle があれば `okf-lint-ops / lint` なども）。
+- **Code Owners のレビューを必須にし、各 bundle の規約を `CODEOWNERS` に登録する。**
+  lint と verify が従う規則を、オーナーの承認なしに変えられないようにします。
+
+  ```
+  /knowledge/CONVENTIONS.md @your-org/knowledge-owners
+  ```
+
+okf-lint を必須にして GitHub App を使わない場合、`/okf verify` のたびに、bot のコミットに対する lint の実行をメンテナーが承認する必要があります（後述）。
 
 ## 確認の流れ
 
@@ -101,7 +119,7 @@ GitHub App を使わない場合、`okf-verify` は `GITHUB_TOKEN` で push し�
 
 | スクリプト | 役割 |
 | --- | --- |
-| `lint.py <bundle> [--base <ref>] [--format text\|github]` | 仕様への適合とチームの規約を検査する（OKF001〜OKF011） |
+| `lint.py <bundle> [--base <ref>] [--format text\|github]` | 仕様への適合とチームの規約を検査する（OKF001〜OKF012） |
 | `index.py <bundle> [--check]` | `index.md` を生成する、または古さを検出する（§8） |
 | `status.py <bundle> [--now <iso>] [--format md\|json] [--link-prefix <url>]` | 対応が必要な concept を一覧にする（規約ファイルは含めない） |
 | `verify.py <bundle> <path>... --by human:<id> --at <iso>` | 確認の記録を追記する（ワークフローが使う） |
@@ -123,6 +141,16 @@ uv run pytest
 actionlint
 claude plugin validate .
 ```
+
+エージェントの振る舞いは `claude plugin eval` で確認します。
+ケースは `evals/` にあり、それぞれ小さな bundle を用意してから、エージェントが残したファイルを採点します。
+
+```sh
+claude plugin eval . --scaffold --ablation none --allow-tools Write Edit Bash
+```
+
+eval のサンドボックスはネットワークに出られないため、`uv run` が PyYAML を取得できず、エージェントは lint を実行できません。
+そのため、採点はファイルを直接検査して行います。
 
 ## ライセンス
 

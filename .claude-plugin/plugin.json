@@ -1,6 +1,6 @@
 {
   "name": "okf-knowledge",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Write, verify, and maintain an Open Knowledge Format (OKF) v0.2 knowledge bundle in a team repository.",
   "author": {
     "name": "kumewata",

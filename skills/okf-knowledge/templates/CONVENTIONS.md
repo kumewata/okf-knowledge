@@ -17,6 +17,8 @@ okf_conventions:
     allow_self_verify: true     # may someone who committed to the PR verify it?
     require_sha: true           # must /okf verify name the commit, as in /okf verify @<sha> <path>?
     bot_git_author: okf-verify[bot]
+  lint:
+    strict: []                  # warnings to treat as errors, such as [OKF011]
   actors:
     agent_pattern: '^claude-code/\S+$'
     human_pattern: '^human:[A-Za-z0-9_-]+$'

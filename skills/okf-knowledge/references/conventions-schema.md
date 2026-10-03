@@ -14,6 +14,7 @@ A given `types` mapping replaces the whole default vocabulary; inside it, a miss
 | `unknown_type` | `warn` or `error` for a type outside the vocabulary (OKF009). |
 | `verify.allow_self_verify` | Whether someone who opened or committed to the pull request may `/okf verify` it. |
 | `verify.require_sha` | Whether `/okf verify` must name the head commit (`/okf verify @<sha> <path>`), so that a push after the comment cannot be verified unseen. |
+| `lint.strict` | Rules whose warnings become errors, such as `[OKF011]`. It can only raise levels, never lower them. |
 | `verify.bot_git_author` | Git author name of the okf-verify commits; outside CI, the only author allowed to add `human:` entries (OKF006). |
 | `actors.agent_pattern` | Regex for agent actors in `generated.by`. |
 | `actors.human_pattern` | Regex for people; also what `verify.py` accepts for `--by`. |
@@ -35,6 +36,8 @@ verify:
   allow_self_verify: true
   require_sha: true
   bot_git_author: okf-verify[bot]
+lint:
+  strict: []
 actors:
   agent_pattern: '^claude-code/\S+$'
   human_pattern: '^human:[A-Za-z0-9_-]+$'
@@ -44,6 +47,7 @@ actors:
 ## Lint rules
 
 `lint.py` exits 1 when any error is reported. OKF006 and OKF011 need `--base`.
+`lint.strict` in the conventions turns the listed rules' warnings into errors.
 
 | Rule | Level | Finding | Basis |
 | --- | --- | --- | --- |
@@ -58,4 +62,5 @@ actors:
 | OKF009 | per `unknown_type` | A type outside the vocabulary | team rule |
 | OKF010 | error | `index.md` with frontmatter, other than `okf_version` at the bundle root | §8 |
 | OKF011 | warning | Content changed since `--base` but `generated.at` did not | team rule |
+| OKF012 | warning | The bundle-root `index.md` declares an `okf_version` these rules were not written for | §12 |
 | CONV | warning | An invalid or unknown key in `okf_conventions` | — |

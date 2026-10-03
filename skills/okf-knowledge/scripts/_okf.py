@@ -18,6 +18,8 @@ from typing import Any
 import yaml
 
 RESERVED = frozenset({"index.md", "log.md"})
+SUPPORTED_OKF_VERSIONS = ("0.2",)
+LINT_RULES = tuple(f"OKF{n:03d}" for n in range(1, 13))
 CONVENTIONS_FILE = "CONVENTIONS.md"
 CONVENTIONS_TYPE = "OKF Conventions"
 
@@ -119,6 +121,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "unknown_type": "warn",
     "verify": {"allow_self_verify": True, "require_sha": True, "bot_git_author": "okf-verify[bot]"},
+    "lint": {"strict": []},
     "actors": {
         "agent_pattern": r"^claude-code/\S+$",
         "human_pattern": r"^human:[A-Za-z0-9_-]+$",
@@ -213,6 +216,17 @@ def load_conventions(bundle: Path, text: str | None = None) -> Conventions:
             data["unknown_type"] = given["unknown_type"]
         else:
             warnings.append("okf_conventions.unknown_type: must be warn or error; using warn")
+
+    if "lint" in given:
+        sub = given["lint"]
+        strict = sub.get("strict") if isinstance(sub, dict) else None
+        if isinstance(sub, dict) and set(sub) - {"strict"}:
+            warnings.append(f"okf_conventions.lint: unknown key(s) {sorted(set(sub) - {'strict'})}, ignored")
+        if isinstance(strict, list) and all(r in LINT_RULES for r in strict):
+            data["lint"]["strict"] = list(strict)
+        else:
+            warnings.append(f"okf_conventions.lint.strict: must be a list of rules from {LINT_RULES[0]} "
+                            f"to {LINT_RULES[-1]}; using []")
 
     for section, checks in (
         ("verify", {"allow_self_verify": bool, "require_sha": bool, "bot_git_author": str}),
