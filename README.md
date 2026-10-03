@@ -1,5 +1,7 @@
 # okf-knowledge
 
+English | [日本語](README.ja.md)
+
 A Claude Code plugin for keeping team knowledge as an [Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md) bundle in a repository: written by agents, verified by people, checked by CI.
 
 OKF stores knowledge as markdown files with YAML frontmatter.
