@@ -6,7 +6,7 @@ on:
 jobs:
   okf-lint:
     # Release tags never move. For the strongest pin, use the tag's commit SHA.
-    uses: kumewata/okf-knowledge/.github/workflows/okf-lint.yml@v1.0.0
+    uses: kumewata/okf-knowledge/.github/workflows/okf-lint.yml@v1.0.1
     permissions:
       contents: read
       pull-requests: read

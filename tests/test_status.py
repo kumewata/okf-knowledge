@@ -36,3 +36,18 @@ def test_status_markdown_empty_section(bundle):
     b = bundle({"a.md": "---\ntype: Note\n---\n"})
     md = status.to_markdown(status.classify(b, NOW), NOW)
     assert "## Stale (0)\n\n_none_" in md
+
+
+def test_status_skips_conventions_file(bundle):
+    b = bundle({"CONVENTIONS.md": "---\ntype: OKF Conventions\nokf_conventions: {}\n---\n",
+                "a.md": "---\ntype: Note\n---\n"})
+    assert [r["cid"] for r in status.classify(b, NOW)] == ["a"]
+
+
+def test_status_link_prefix(bundle):
+    b = bundle({"runbooks/restart api.md": "---\ntype: Runbook\ntitle: Restart\n---\n"})
+    rows = status.classify(b, NOW)
+    assert "- [Restart](/runbooks/restart%20api.md) — unverified" in status.to_markdown(rows, NOW)
+    url = "https://github.com/o/r/blob/main/knowledge/"
+    md = status.to_markdown(rows, NOW, url)
+    assert f"- [Restart]({url}runbooks/restart%20api.md) — unverified" in md

@@ -4,12 +4,18 @@
 # ///
 """List the concepts of an OKF v0.2 bundle that need attention.
 
-    uv run status.py <bundle> [--now <iso8601>] [--format md|json]
+    uv run status.py <bundle> [--now <iso8601>] [--format md|json] [--link-prefix <url>]
 
 Sections: stale (now >= stale_after), deprecated, unverified, changed since
 the last verification (generated.at newer than verified[].at), and
 unreadable (no parseable frontmatter or no `type`). A concept can appear in
-more than one section. --now defaults to the current time in UTC.
+more than one section. The conventions file (`type: OKF Conventions`) is
+not listed: it holds rules, not knowledge. --now defaults to the current
+time in UTC.
+
+Links in the markdown are the concept path after --link-prefix, which
+defaults to `/` (a bundle path, §6.1). For an issue body, pass the bundle's
+URL, such as https://github.com/<owner>/<repo>/blob/main/knowledge/.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 import _okf
 
@@ -34,6 +41,8 @@ SECTIONS = (
 def classify(bundle: Path, now: datetime) -> list[dict]:
     rows = []
     for c in _okf.load_concepts(bundle):
+        if c.type == _okf.CONVENTIONS_TYPE:
+            continue
         fm = c.frontmatter
         readable = c.error is None and bool(c.type)
         rows.append({
@@ -52,7 +61,7 @@ def classify(bundle: Path, now: datetime) -> list[dict]:
     return rows
 
 
-def to_markdown(rows: list[dict], now: datetime) -> str:
+def to_markdown(rows: list[dict], now: datetime, link_prefix: str = "/") -> str:
     lines = [f"OKF bundle status as of {now.isoformat()}", ""]
     for key, heading in SECTIONS:
         hits = [r for r in rows if r[key]]
@@ -60,7 +69,7 @@ def to_markdown(rows: list[dict], now: datetime) -> str:
         lines.append("")
         for r in hits:
             detail = r["tier"] + (f", stale_after {r['stale_after']}" if r["stale_after"] else "")
-            lines.append(f"- [{r['title']}](/{r['cid']}.md) — {detail}")
+            lines.append(f"- [{r['title']}]({link_prefix}{quote(r['cid'])}.md) — {detail}")
         if not hits:
             lines.append("_none_")
         lines.append("")
@@ -72,6 +81,7 @@ def main() -> int:
     ap.add_argument("bundle", type=Path)
     ap.add_argument("--now", help="ISO 8601 datetime with an offset (default: now, UTC)")
     ap.add_argument("--format", choices=("md", "json"), default="md")
+    ap.add_argument("--link-prefix", default="/", help="prepended to each concept path in markdown links")
     args = ap.parse_args()
 
     now = _okf.now_utc()
@@ -80,7 +90,10 @@ def main() -> int:
         if now is None:
             ap.error("--now must be an ISO 8601 datetime with an offset")
     rows = classify(args.bundle, now)
-    print(json.dumps(rows, ensure_ascii=False, indent=2) if args.format == "json" else to_markdown(rows, now))
+    if args.format == "json":
+        print(json.dumps(rows, ensure_ascii=False, indent=2))
+    else:
+        print(to_markdown(rows, now, args.link_prefix))
     return 0
 
 
