@@ -1,0 +1,124 @@
+# Reusable: handle a `/okf verify @<sha> <path>...` comment on a pull request.
+#
+# Runs with a write token, so it never runs code from the pull request: the
+# scripts are checked out at this workflow file's own commit into okf/, the
+# pull request into pr/ without credentials, and uv runs from okf/ with
+# --no-config --no-project, a fixed Python, and no cache. verify.py only
+# parses YAML and edits `verified` lines.
+#
+# The rules come from the base branch's CONVENTIONS.md. The pull request is
+# checked out at the head commit seen here, and the push is a fast-forward of
+# that commit, so a push made after the comment makes it fail.
+#
+# With app_id and app_private_key it pushes with a GitHub App token, so the
+# lint workflow re-runs on the new commit without approval. Without them it
+# pushes with GITHUB_TOKEN, and the re-run waits for a maintainer's approval.
+name: okf-verify
+
+on:
+  workflow_call:
+    inputs:
+      bundle:
+        description: Path of the bundle in the calling repository
+        type: string
+        default: knowledge
+    secrets:
+      app_id:
+        required: false
+      app_private_key:
+        required: false
+
+jobs:
+  verify:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/okf verify')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      COMMENTER: ${{ github.event.comment.user.login }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      BUNDLE: ${{ inputs.bundle }}
+      HAS_APP: ${{ secrets.app_id != '' }}
+    steps:
+      - name: Check the commenter and the pull request
+        id: pr
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          reply() {
+            printf 'okf-verify: %s\n' "$1" > "$RUNNER_TEMP/reply.md"
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/reply.md" > /dev/null
+          }
+          perm=$(gh api "repos/$REPO/collaborators/$COMMENTER/permission" --jq .permission)
+          if [ "$perm" != admin ] && [ "$perm" != write ]; then
+            reply "@$COMMENTER needs write access to verify knowledge."; exit 1
+          fi
+          pr=$(gh api "repos/$REPO/pulls/$PR")
+          head_ref=$(jq -r .head.ref <<<"$pr")
+          if [ "$(jq -r .head.repo.full_name <<<"$pr")" != "$REPO" ]; then
+            reply "pull requests from forks are not supported yet; verify after merging."; exit 1
+          fi
+          if [ "$head_ref" = "$(gh api "repos/$REPO" --jq .default_branch)" ]; then
+            reply "the head branch is the default branch; verify from a topic branch."; exit 1
+          fi
+          base_ref=$(jq -r .base.ref <<<"$pr")
+          {
+            echo "head_ref=$head_ref"
+            echo "head_sha=$(jq -r .head.sha <<<"$pr")"
+          } >> "$GITHUB_OUTPUT"
+          authors=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].author.login // empty' | sort -u | paste -sd, -)
+          echo "PR_AUTHORS=$(jq -r .user.login <<<"$pr"),$authors" >> "$GITHUB_ENV"
+          gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
+          gh api "repos/$REPO/contents/$BUNDLE/CONVENTIONS.md?ref=$base_ref" --jq .content 2>/dev/null \
+            | base64 -d > "$RUNNER_TEMP/conventions.md" || : > "$RUNNER_TEMP/conventions.md"
+          printf '%s' "$COMMENT_BODY" > "$RUNNER_TEMP/comment.txt"
+      - name: Create a GitHub App token
+        id: app
+        if: env.HAS_APP == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.app_id }}
+          private-key: ${{ secrets.app_private_key }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: okf
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          path: pr
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: false
+          python-version: "3.12"
+      - name: Verify and commit
+        working-directory: okf
+        env:
+          CREATED_AT: ${{ github.event.comment.created_at }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          if ! uv run --no-config --no-project skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
+                --comment "$RUNNER_TEMP/comment.txt" --head-sha "$HEAD_SHA" --repo-root ../pr \
+                --conventions "$RUNNER_TEMP/conventions.md" --pr-authors "$PR_AUTHORS" \
+                --changed "$RUNNER_TEMP/changed.txt" --by "human:$COMMENTER" --at "$CREATED_AT" \
+                --commit > "$RUNNER_TEMP/out.txt" 2>&1; then
+            { echo 'okf-verify failed:'; echo; echo '```'; head -c 2000 "$RUNNER_TEMP/out.txt"; echo; echo '```'; } \
+              > "$RUNNER_TEMP/reply.md"
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/reply.md" > /dev/null
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/out.txt"
+      - name: Push and acknowledge
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          PUSH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+        run: |
+          git -C pr push "https://x-access-token:${PUSH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${HEAD_REF}"
+          gh api "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content='+1' > /dev/null

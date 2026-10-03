@@ -1,0 +1,11 @@
+# Copy to .github/workflows/okf-lint.yml and make the job a required check.
+name: okf-lint
+on:
+  pull_request:
+    paths: ["knowledge/**"]
+jobs:
+  okf-lint:
+    # Pin to a full commit SHA in production; @v1 follows the v1 tag.
+    uses: kumewata/okf-knowledge/.github/workflows/okf-lint.yml@v1
+    with:
+      bundle: knowledge

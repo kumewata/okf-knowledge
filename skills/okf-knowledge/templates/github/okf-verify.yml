@@ -1,0 +1,22 @@
+# Copy to .github/workflows/okf-verify.yml.
+# Optional: create a GitHub App with contents:write and pull-requests:write,
+# install it on this repository, and store its ID and private key as the
+# secrets OKF_APP_ID and OKF_APP_PRIVATE_KEY, so the lint check re-runs on the
+# verify commit without a maintainer's approval.
+name: okf-verify
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  okf-verify:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/okf verify')
+    # Pin to a full commit SHA in production; @v1 follows the v1 tag.
+    uses: kumewata/okf-knowledge/.github/workflows/okf-verify.yml@v1
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      bundle: knowledge
+    secrets:
+      app_id: ${{ secrets.OKF_APP_ID }}
+      app_private_key: ${{ secrets.OKF_APP_PRIVATE_KEY }}

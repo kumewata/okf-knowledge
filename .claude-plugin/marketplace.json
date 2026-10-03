@@ -1,0 +1,15 @@
+{
+  "name": "okf-knowledge",
+  "description": "Claude Code plugin for running an OKF v0.2 knowledge bundle in team repositories.",
+  "owner": {
+    "name": "kumewata",
+    "url": "https://github.com/kumewata"
+  },
+  "plugins": [
+    {
+      "name": "okf-knowledge",
+      "description": "Write, verify, and maintain an OKF v0.2 knowledge bundle in a team repository.",
+      "source": "./"
+    }
+  ]
+}

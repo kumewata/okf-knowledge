@@ -1,0 +1,24 @@
+[project]
+name = "okf-knowledge"
+version = "0.1.0"
+description = "Claude Code plugin for running an Open Knowledge Format (OKF) v0.2 knowledge bundle in team repositories"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8", "pyyaml>=6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["skills/okf-knowledge/scripts"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "PLW", "FURB"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]  # long YAML fixtures read better on one line

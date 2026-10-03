@@ -1,0 +1,72 @@
+# Reusable: lint an OKF bundle and check its index.md files on pull requests.
+#
+# The scripts are checked out at this workflow file's own commit into okf/,
+# and the pull request into pr/, so nothing in the pull request (uv.toml,
+# pyproject.toml, a planted okf/ directory) can change what runs. uv runs with
+# --no-config --no-project, a fixed Python, and no cache.
+#
+# OKF006 is checked against the pull request's `/okf verify` comments by
+# writers, and the conventions come from the base branch.
+name: okf-lint
+
+on:
+  workflow_call:
+    inputs:
+      bundle:
+        description: Path of the bundle in the calling repository
+        type: string
+        default: knowledge
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      BUNDLE: ${{ inputs.bundle }}
+      BASE_REF: ${{ github.base_ref }}
+      PR: ${{ github.event.pull_request.number }}
+      PR_OPENER: ${{ github.event.pull_request.user.login }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: okf
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: false
+          python-version: "3.12"
+      - name: Collect /okf verify comments
+        if: env.PR != ''
+        run: |
+          gh api "repos/$REPO/issues/$PR/comments" --paginate --slurp | jq 'add // []' > "$RUNNER_TEMP/comments.json"
+          writers=""
+          for login in $(jq -r '[.[] | select(.body | startswith("/okf verify")) | .user.login] | unique | .[]' "$RUNNER_TEMP/comments.json"); do
+            perm=$(gh api "repos/$REPO/collaborators/$login/permission" --jq .permission 2>/dev/null || echo none)
+            if [ "$perm" = admin ] || [ "$perm" = write ]; then writers="$writers,$login"; fi
+          done
+          authors=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].author.login // empty' | sort -u | paste -sd, -)
+          echo "WRITERS=$writers" >> "$GITHUB_ENV"
+          echo "PR_AUTHORS=$PR_OPENER,$authors" >> "$GITHUB_ENV"
+      - name: Lint
+        working-directory: pr
+        run: |
+          args=()
+          if [ -n "$BASE_REF" ]; then args+=(--base "origin/$BASE_REF" --conventions-ref "origin/$BASE_REF"); fi
+          if [ -n "$PR" ]; then
+            args+=(--verify-comments "$RUNNER_TEMP/comments.json" --writers "$WRITERS" --pr-authors "$PR_AUTHORS")
+          fi
+          uv run --no-config --no-project ../okf/skills/okf-knowledge/scripts/lint.py "$BUNDLE" "${args[@]}" --format github
+      - name: Check index.md
+        working-directory: pr
+        run: uv run --no-config --no-project ../okf/skills/okf-knowledge/scripts/index.py "$BUNDLE" --check

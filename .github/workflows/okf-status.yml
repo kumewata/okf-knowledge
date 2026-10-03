@@ -1,0 +1,53 @@
+# Reusable: open or update one issue listing the concepts that need attention.
+# Same layout as okf-lint: scripts in okf/, the repository in pr/.
+name: okf-status
+
+on:
+  workflow_call:
+    inputs:
+      bundle:
+        description: Path of the bundle in the calling repository
+        type: string
+        default: knowledge
+      label:
+        description: Label of the status issue
+        type: string
+        default: okf-status
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      BUNDLE: ${{ inputs.bundle }}
+      LABEL: ${{ inputs.label }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: okf
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: pr
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: false
+          python-version: "3.12"
+      - name: Open or update the status issue
+        working-directory: pr
+        run: |
+          uv run --no-config --no-project ../okf/skills/okf-knowledge/scripts/status.py "$BUNDLE" > "$RUNNER_TEMP/status.md"
+          gh label create "$LABEL" --repo "$REPO" --force > /dev/null
+          number=$(gh issue list --repo "$REPO" --label "$LABEL" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/status.md"
+          else
+            gh issue create --repo "$REPO" --label "$LABEL" --title "Knowledge bundle status" --body-file "$RUNNER_TEMP/status.md"
+          fi

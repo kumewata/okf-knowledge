@@ -1,0 +1,15 @@
+# Copy to .github/workflows/okf-status.yml.
+name: okf-status
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # Mondays 00:00 UTC
+  workflow_dispatch:
+jobs:
+  okf-status:
+    # Pin to a full commit SHA in production; @v1 follows the v1 tag.
+    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1
+    permissions:
+      contents: read
+      issues: write
+    with:
+      bundle: knowledge

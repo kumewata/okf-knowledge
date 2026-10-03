@@ -1,0 +1,11 @@
+{
+  "name": "okf-knowledge",
+  "version": "0.1.0",
+  "description": "Write, verify, and maintain an Open Knowledge Format (OKF) v0.2 knowledge bundle in a team repository.",
+  "author": {
+    "name": "kumewata",
+    "url": "https://github.com/kumewata"
+  },
+  "repository": "https://github.com/kumewata/okf-knowledge",
+  "license": "Apache-2.0"
+}

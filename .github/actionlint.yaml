@@ -1,0 +1,7 @@
+# job.workflow_repository and job.workflow_sha are documented job-context
+# properties (GitHub Docs, "Contexts reference"; not on GitHub Enterprise
+# Server) that actionlint 1.7.12 does not know yet.
+paths:
+  .github/workflows/**/*.yml:
+    ignore:
+      - 'property "workflow_(repository|sha)" is not defined'
