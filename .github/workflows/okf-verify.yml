@@ -99,16 +99,23 @@ jobs:
           enable-cache: false
           python-version: "3.12"
       - name: Verify and commit
+        id: verify
         working-directory: okf
         env:
           CREATED_AT: ${{ github.event.comment.created_at }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          if ! uv run -q --no-config --no-project skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
-                --comment "$RUNNER_TEMP/comment.txt" --head-sha "$HEAD_SHA" --repo-root ../pr \
-                --conventions "$RUNNER_TEMP/conventions.md" --pr-authors "$PR_AUTHORS" \
-                --changed "$RUNNER_TEMP/changed.txt" --by "human:$COMMENTER" --at "$CREATED_AT" \
-                --commit > "$RUNNER_TEMP/out.txt" 2>&1; then
+          status=0
+          uv run -q --no-config --no-project skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
+            --comment "$RUNNER_TEMP/comment.txt" --head-sha "$HEAD_SHA" --repo-root ../pr \
+            --conventions "$RUNNER_TEMP/conventions.md" --pr-authors "$PR_AUTHORS" \
+            --changed "$RUNNER_TEMP/changed.txt" --by "human:$COMMENTER" --at "$CREATED_AT" \
+            --commit > "$RUNNER_TEMP/out.txt" 2>&1 || status=$?
+          if [ "$status" = 4 ]; then
+            # The comment names no path in this bundle; another bundle's job handles it.
+            cat "$RUNNER_TEMP/out.txt"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$status" != 0 ]; then
             { echo 'okf-verify failed:'; echo; echo '```'; head -c 2000 "$RUNNER_TEMP/out.txt"; echo; echo '```'; } \
               > "$RUNNER_TEMP/reply.md"
             gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/reply.md" > /dev/null
@@ -116,6 +123,7 @@ jobs:
           fi
           cat "$RUNNER_TEMP/out.txt"
       - name: Push and acknowledge
+        if: steps.verify.outputs.skip != 'true'
         env:
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
           PUSH_TOKEN: ${{ steps.app.outputs.token || github.token }}

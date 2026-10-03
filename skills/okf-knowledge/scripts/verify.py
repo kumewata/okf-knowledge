@@ -25,13 +25,19 @@ Options for the workflow:
                   line; other paths are refused
   --commit        commit the written files as the conventions' bot_git_author
 
+With --comment, paths outside this bundle are skipped, so that one comment
+can be handled by one job per bundle; the SHA rules apply only when some path
+is inside it.
+
 Exit status: 0 written or already verified, 2 invalid input, 3 unsupported
-`verified` layout (edit that file by hand).
+`verified` layout (edit that file by hand), 4 a comment with no path in this
+bundle (nothing to do).
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -44,6 +50,10 @@ _KEY = re.compile(r"^verified\s*:(.*?)(\r?\n)?$")
 
 class Unsupported(Exception):
     pass
+
+
+class NotThisBundle(Exception):
+    """A `/okf verify` comment that names no path inside this bundle."""
 
 
 def _continuation_end(lines: list[str], start: int, stop: int) -> int:
@@ -170,11 +180,21 @@ def _without_verified(fm: dict) -> dict:
     return {k: v for k, v in fm.items() if k != "verified"}
 
 
-def paths_from_comment(body: str, head_sha: str | None, conv: _okf.Conventions) -> list[str]:
+def in_bundle(repo_root: Path, bundle: Path, raw: str) -> bool:
+    """Whether a repository path lies inside the bundle (lexically; plan() checks it fully)."""
+    full = Path(os.path.normpath(repo_root.resolve() / raw))
+    return full.is_relative_to(bundle.resolve())
+
+
+def paths_from_comment(body: str, head_sha: str | None, conv: _okf.Conventions,
+                       keep=lambda raw: True) -> list[str]:
     parsed = _okf.parse_verify_comment(body)
     if parsed is None:
         raise ValueError("the comment is not `/okf verify [@<sha>] <path>...`")
     sha, paths = parsed
+    paths = [p for p in paths if keep(p)]
+    if not paths:
+        raise NotThisBundle
     if sha is None and conv.data["verify"]["require_sha"]:
         raise ValueError("name the commit you checked: `/okf verify @<sha> <path>...`")
     if sha is not None and not (head_sha or "").startswith(sha):
@@ -205,12 +225,16 @@ def main() -> int:
         if args.comment:
             if paths:
                 raise ValueError("give paths either as arguments or in --comment, not both")
-            paths = paths_from_comment(_okf.read_text(args.comment), args.head_sha, conv)
+            paths = paths_from_comment(_okf.read_text(args.comment), args.head_sha, conv,
+                                       keep=lambda raw: in_bundle(args.repo_root, args.bundle, raw))
         changed = None
         if args.changed:
             changed = {ln.strip() for ln in _okf.read_text(args.changed).splitlines() if ln.strip()}
         authors = {x.strip() for x in args.pr_authors.split(",") if x.strip()}
         changes = plan(args.repo_root, args.bundle, paths, args.by, args.at, conv, authors, changed)
+    except NotThisBundle:
+        print(f"no path in the comment is inside {args.bundle}; nothing to do")
+        return 4
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

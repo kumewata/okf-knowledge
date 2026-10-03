@@ -10,7 +10,7 @@ on:
         type: string
         default: knowledge
       label:
-        description: Label of the status issue
+        description: Label of the status issue; give each bundle its own
         type: string
         default: okf-status
 
@@ -51,5 +51,5 @@ jobs:
           if [ -n "$number" ]; then
             gh issue edit "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/status.md"
           else
-            gh issue create --repo "$REPO" --label "$LABEL" --title "Knowledge bundle status" --body-file "$RUNNER_TEMP/status.md"
+            gh issue create --repo "$REPO" --label "$LABEL" --title "Knowledge bundle status: $BUNDLE" --body-file "$RUNNER_TEMP/status.md"
           fi

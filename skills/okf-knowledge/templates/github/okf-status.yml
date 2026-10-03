@@ -1,4 +1,6 @@
 # Copy to .github/workflows/okf-status.yml.
+# The bundle is knowledge/ here; change `bundle` for another directory. For
+# several bundles, add one job per bundle, each with its own `label`.
 name: okf-status
 on:
   schedule:
@@ -7,7 +9,7 @@ on:
 jobs:
   okf-status:
     # Release tags never move. For the strongest pin, use the tag's commit SHA.
-    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1.0.1
+    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1.0.2
     permissions:
       contents: read
       issues: write

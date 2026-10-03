@@ -44,8 +44,14 @@ Claude Code に「OKF の knowledge bundle をセットアップして」と頼�
 2. frontmatter に `okf_version: "0.2"` を書いた `knowledge/index.md` を作り、残りの index を [`scripts/index.py`](skills/okf-knowledge/scripts/index.py) で生成する（`uv run index.py knowledge`）。
 3. [`templates/github/`](skills/okf-knowledge/templates/github/) の 3 つのワークフローを `.github/workflows/` にコピーし、`okf-lint` を必須チェックにする。
 
+`knowledge/` は既定の名前にすぎず、bundle は任意のディレクトリに置けます。
+その場合は、ワークフローの `paths` と `bundle` を合わせて変えてください。
+1 つのリポジトリに複数の bundle を置くこともでき、bundle ごとに `CONVENTIONS.md` を持ちます。
+このときは、各ワークフローに bundle ごとの job を足し、okf-status の job にはそれぞれ別の `label` を付けます。
+`/okf verify` のコメントには、1 つの bundle のパスだけを書いてください。
+
 コピーしたワークフローは、このリポジトリの再利用ワークフローを呼びます。
-再利用ワークフローはスクリプトを自分と同じコミットで checkout するので、`@v1.0.1` と指定すれば両方が固定されます。
+再利用ワークフローはスクリプトを自分と同じコミットで checkout するので、`@v1.0.2` と指定すれば両方が固定されます。
 リリースタグ（`v1.0.0`、`v1.0.1` など）は一度付けたら動かさず、修正は新しいタグで出します。
 `v1` タグは使わないでください。既知の不具合があるリリース前のコミットを指しています。
 

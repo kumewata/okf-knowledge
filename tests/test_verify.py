@@ -188,3 +188,30 @@ def test_verify_keeps_bom_and_rejects_invalid_utf8(bundle):
     assert new.startswith("\ufeff---\n") and BY in new
     with pytest.raises(ValueError, match="UTF-8"):
         run(b, "latin1.md")
+
+
+def test_comment_skips_paths_of_other_bundles(tmp_path, monkeypatch, capsys):
+    repo = tmp_path
+    for name in ("docs/kb", "ops/kb"):
+        (repo / name).mkdir(parents=True)
+        (repo / name / "a.md").write_text(HEAD + "---\n")
+    comment = tmp_path / "comment.txt"
+    comment.write_text("/okf verify @abc1234 ops/kb/a.md")
+    base = ["verify.py", "--comment", str(comment), "--head-sha", "abc1234", "--repo-root", str(repo),
+            "--by", BY, "--at", AT]
+    monkeypatch.setattr("sys.argv", [base[0], str(repo / "docs/kb"), *base[1:]])
+    assert verify.main() == 4
+    assert BY not in (repo / "docs/kb/a.md").read_text()
+    monkeypatch.setattr("sys.argv", [base[0], str(repo / "ops/kb"), *base[1:]])
+    assert verify.main() == 0
+    assert BY in (repo / "ops/kb/a.md").read_text()
+
+
+def test_sha_rules_apply_only_to_the_bundle_named(tmp_path, monkeypatch):
+    (tmp_path / "kb").mkdir()
+    (tmp_path / "kb" / "a.md").write_text(HEAD + "---\n")
+    comment = tmp_path / "comment.txt"
+    comment.write_text("/okf verify other/a.md")  # no SHA, but not about this bundle
+    monkeypatch.setattr("sys.argv", ["verify.py", str(tmp_path / "kb"), "--comment", str(comment),
+                                     "--head-sha", "abc", "--repo-root", str(tmp_path), "--by", BY, "--at", AT])
+    assert verify.main() == 4

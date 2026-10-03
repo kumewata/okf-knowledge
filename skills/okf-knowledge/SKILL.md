@@ -1,6 +1,6 @@
 ---
 name: okf-knowledge
-description: Use when writing, updating, reading, or maintaining team knowledge kept as an Open Knowledge Format (OKF) v0.2 bundle in a repository, usually a `knowledge/` directory whose `CONVENTIONS.md` has `type: OKF Conventions`. Covers runbooks, ADRs, table and metric definitions, glossary entries, references and notes; asking a person to verify knowledge; finding stale or unverified knowledge; regenerating `index.md`; fixing lint findings named OKF001–OKF011; and setting up a new bundle. Do NOT use for documentation that lives outside the bundle.
+description: Use when writing, updating, reading, or maintaining team knowledge kept as an Open Knowledge Format (OKF) v0.2 bundle in a repository: a directory (`knowledge/` by default) whose `CONVENTIONS.md` has `type: OKF Conventions`. Covers runbooks, ADRs, table and metric definitions, glossary entries, references and notes; asking a person to verify knowledge; finding stale or unverified knowledge; regenerating `index.md`; fixing lint findings named OKF001–OKF011; and setting up a new bundle. Do NOT use for documentation that lives outside the bundle.
 ---
 
 # okf-knowledge
@@ -13,7 +13,10 @@ Scripts run with `uv run <skill-dir>/scripts/<name>.py`; they declare their own 
 
 ## Find the bundle
 
-Look for a `CONVENTIONS.md` with `type: OKF Conventions`, usually `knowledge/CONVENTIONS.md`.
+A bundle is a directory whose root holds a `CONVENTIONS.md` with `type: OKF Conventions`.
+`knowledge/` is the default name, but any directory works, and a repository may hold several bundles (not nested).
+Work in the bundle that contains the file at hand: the nearest ancestor directory with such a `CONVENTIONS.md`.
+Below, `<bundle>` is that directory; pass it to every script, and write `/`-rooted paths (rule 5) relative to it.
 Read its `okf_conventions` before writing: it holds the type vocabulary, each type's `stale_after_days`, and which types need a human verification.
 If there is no bundle and the user wants one, see "Set up a bundle".
 
@@ -46,7 +49,7 @@ Ask the person who can do that to check the pull request's latest commit, and th
 /okf verify @<head commit SHA> knowledge/runbooks/restart-api.md
 ```
 
-Several paths may follow; each must be a file the pull request changed.
+Several paths may follow; each must be a file the pull request changed, and all of them in one bundle (use one comment per bundle).
 The workflow adds `{ by: human:<their GitHub ID>, at: <comment time> }` and pushes a commit.
 It refuses commenters without write access, a SHA that is not the head, and (when the conventions say so) people who opened or committed to the pull request.
 If the content changes afterwards, the verification no longer covers it (OKF007), and types that require one block the merge (OKF008).
@@ -71,10 +74,12 @@ For each one, propose one of:
 
 ## Set up a bundle
 
-1. Copy `<skill-dir>/templates/CONVENTIONS.md` to `knowledge/CONVENTIONS.md` and adjust it with the team.
-2. Create `knowledge/index.md` with `okf_version: "0.2"` in its frontmatter, then run `index.py`.
-3. Copy the workflows in `<skill-dir>/templates/github/` to `.github/workflows/`.
-4. Add a line to the repository's `CLAUDE.md`: knowledge lives in `knowledge/`; start from `knowledge/index.md`.
+1. Ask the user where the bundle should live; suggest `knowledge/`. Call the answer `<bundle>`.
+2. Copy `<skill-dir>/templates/CONVENTIONS.md` to `<bundle>/CONVENTIONS.md` and adjust it with the team.
+3. Create `<bundle>/index.md` with `okf_version: "0.2"` in its frontmatter, then run `index.py <bundle>`.
+4. Copy the workflows in `<skill-dir>/templates/github/` to `.github/workflows/`, and set `bundle: <bundle>` in each, plus `paths: ["<bundle>/**"]` in okf-lint. Leave the `uses:` lines as they are.
+   If the repository already has okf workflows for another bundle, add a job per bundle to them instead (okf-status: give the new job its own `label`).
+5. Add a line to the repository's `CLAUDE.md`: knowledge lives in `<bundle>/`; start from `<bundle>/index.md`.
 
 ## References
 
