@@ -66,7 +66,7 @@ jobs:
           if [ -n "$PR" ]; then
             args+=(--verify-comments "$RUNNER_TEMP/comments.json" --writers "$WRITERS" --pr-authors "$PR_AUTHORS")
           fi
-          uv run --no-config --no-project ../okf/skills/okf-knowledge/scripts/lint.py "$BUNDLE" "${args[@]}" --format github
+          uv run -q --no-config --no-project ../okf/skills/okf-knowledge/scripts/lint.py "$BUNDLE" "${args[@]}" --format github
       - name: Check index.md
         working-directory: pr
-        run: uv run --no-config --no-project ../okf/skills/okf-knowledge/scripts/index.py "$BUNDLE" --check
+        run: uv run -q --no-config --no-project ../okf/skills/okf-knowledge/scripts/index.py "$BUNDLE" --check

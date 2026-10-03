@@ -104,7 +104,7 @@ jobs:
           CREATED_AT: ${{ github.event.comment.created_at }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          if ! uv run --no-config --no-project skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
+          if ! uv run -q --no-config --no-project skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
                 --comment "$RUNNER_TEMP/comment.txt" --head-sha "$HEAD_SHA" --repo-root ../pr \
                 --conventions "$RUNNER_TEMP/conventions.md" --pr-authors "$PR_AUTHORS" \
                 --changed "$RUNNER_TEMP/changed.txt" --by "human:$COMMENTER" --at "$CREATED_AT" \

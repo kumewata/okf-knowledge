@@ -141,7 +141,8 @@ def plan(repo_root: Path, bundle: Path, paths: list[str], by: str, at: str, conv
         if changed is not None and full.relative_to(repo).as_posix() not in changed:
             raise ValueError(f"{raw}: not changed by this pull request")
         try:
-            text = full.read_text(encoding="utf-8", newline="")
+            with open(full, encoding="utf-8", newline="") as f:  # keep CRLF as written
+                text = f.read()
         except UnicodeDecodeError as e:
             raise ValueError(f"{raw}: not valid UTF-8") from e
         bom = "\ufeff" if text.startswith("\ufeff") else ""
@@ -220,7 +221,8 @@ def main() -> int:
         if new is None:
             print(f"already verified: {path}")
         else:
-            path.write_text(new, encoding="utf-8", newline="")
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                f.write(new)
             print(f"verified: {path}")
     written = [str(p) for p, new in changes if new is not None]
     if args.commit and written:
