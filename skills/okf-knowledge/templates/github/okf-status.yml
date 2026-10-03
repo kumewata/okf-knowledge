@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 jobs:
   okf-status:
-    # Pin to a full commit SHA in production; @v1 follows the v1 tag.
-    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1
+    # Release tags never move. For the strongest pin, use the tag's commit SHA.
+    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1.0.0
     permissions:
       contents: read
       issues: write

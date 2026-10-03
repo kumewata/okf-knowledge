@@ -27,7 +27,8 @@ Ask Claude Code to "set up an OKF knowledge bundle", or by hand:
 2. Create `knowledge/index.md` with `okf_version: "0.2"` in its frontmatter, and generate the rest with [`scripts/index.py`](skills/okf-knowledge/scripts/index.py) (`uv run index.py knowledge`).
 3. Copy the three workflows in [`templates/github/`](skills/okf-knowledge/templates/github/) to `.github/workflows/`, and make `okf-lint` a required check.
 
-The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1` pins both.
+The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.0` pins both.
+Release tags (`v1.0.0`, `v1.0.1`, …) are never moved; a fix ships as a new tag. Do not use the `v1` tag: it points at a pre-release commit with a known bug.
 
 ## How verification works
 
