@@ -78,7 +78,7 @@ For each one, propose one of:
 2. Copy `<skill-dir>/templates/CONVENTIONS.md` to `<bundle>/CONVENTIONS.md` and adjust it with the team.
 3. Create `<bundle>/index.md` with `okf_version: "0.2"` in its frontmatter, then run `index.py <bundle>`.
 4. Copy the workflows in `<skill-dir>/templates/github/` to `.github/workflows/`, and set `bundle: <bundle>` in each, plus `paths: ["<bundle>/**"]` in okf-lint. Leave the `uses:` lines as they are.
-   If the repository already has okf workflows for another bundle, add a job per bundle to them instead (okf-status: give the new job its own `label`).
+   If the repository already has okf workflows for another bundle, add a job per bundle to them instead: add `"<bundle>/**"` to okf-lint's `paths` list (it filters the whole workflow), and give the new okf-status job its own `label`.
 5. Add a line to the repository's `CLAUDE.md`: knowledge lives in `<bundle>/`; start from `<bundle>/index.md`.
 
 ## References

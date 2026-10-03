@@ -1,6 +1,7 @@
 # Copy to .github/workflows/okf-lint.yml and make the job a required check.
 # The bundle is knowledge/ here. For another directory, change both `paths`
-# and `bundle`. For several bundles, add one job per bundle (and its paths).
+# and `bundle`. For several bundles, list every bundle directory in `paths`
+# (it filters the whole workflow) and add one job per bundle.
 name: okf-lint
 on:
   pull_request:
@@ -8,7 +9,7 @@ on:
 jobs:
   okf-lint:
     # Release tags never move. For the strongest pin, use the tag's commit SHA.
-    uses: kumewata/okf-knowledge/.github/workflows/okf-lint.yml@v1.0.2
+    uses: kumewata/okf-knowledge/.github/workflows/okf-lint.yml@v1.0.3
     permissions:
       contents: read
       pull-requests: read

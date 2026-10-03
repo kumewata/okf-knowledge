@@ -30,9 +30,9 @@ Ask Claude Code to "set up an OKF knowledge bundle", or by hand:
 3. Copy the three workflows in [`templates/github/`](skills/okf-knowledge/templates/github/) to `.github/workflows/`, and make `okf-lint` a required check.
 
 `knowledge/` is only the default: put the bundle in any directory and change `paths` and `bundle` in the workflows to match.
-A repository can hold several bundles, each with its own `CONVENTIONS.md`; add one job per bundle to each workflow, give each okf-status job its own `label`, and name the paths of one bundle per `/okf verify` comment.
+A repository can hold several bundles, each with its own `CONVENTIONS.md`; add one job per bundle to each workflow, list every bundle directory in okf-lint's `paths`, give each okf-status job its own `label`, and name the paths of one bundle per `/okf verify` comment.
 
-The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.2` pins both.
+The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.3` pins both.
 Release tags (`v1.0.0`, `v1.0.1`, …) are never moved; a fix ships as a new tag. Do not use the `v1` tag: it points at a pre-release commit with a known bug.
 
 ## How verification works

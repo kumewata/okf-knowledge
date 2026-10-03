@@ -49,7 +49,8 @@ jobs:
           gh label create "$LABEL" --repo "$REPO" --force > /dev/null
           number=$(gh issue list --repo "$REPO" --label "$LABEL" --state open --json number --jq '.[0].number')
           if [ -n "$number" ]; then
-            gh issue edit "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/status.md"
+            gh issue edit "$number" --repo "$REPO" --title "Knowledge bundle status: $BUNDLE" \
+              --body-file "$RUNNER_TEMP/status.md"
           else
             gh issue create --repo "$REPO" --label "$LABEL" --title "Knowledge bundle status: $BUNDLE" --body-file "$RUNNER_TEMP/status.md"
           fi

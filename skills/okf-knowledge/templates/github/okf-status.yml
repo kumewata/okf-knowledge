@@ -9,7 +9,7 @@ on:
 jobs:
   okf-status:
     # Release tags never move. For the strongest pin, use the tag's commit SHA.
-    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1.0.2
+    uses: kumewata/okf-knowledge/.github/workflows/okf-status.yml@v1.0.3
     permissions:
       contents: read
       issues: write
