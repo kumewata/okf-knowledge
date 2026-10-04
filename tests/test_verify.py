@@ -215,3 +215,21 @@ def test_sha_rules_apply_only_to_the_bundle_named(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.argv", ["verify.py", str(tmp_path / "kb"), "--comment", str(comment),
                                      "--head-sha", "abc", "--repo-root", str(tmp_path), "--by", BY, "--at", AT])
     assert verify.main() == 4
+
+
+def test_unlinked_commit_refuses_verification_when_self_verify_is_off(bundle):
+    b = bundle({"a.md": HEAD + "---\n"})
+    strict = _okf.Conventions({**_okf.DEFAULTS, "verify": {**_okf.DEFAULTS["verify"], "allow_self_verify": False}})
+    with pytest.raises(ValueError, match="not linked to a GitHub account"):
+        verify.plan(b, b, [str(b / "a.md")], BY, AT, strict, pr_authors={"alice", "?"})
+    assert verify.plan(b, b, [str(b / "a.md")], BY, AT, CONV, pr_authors={"alice", "?"})[0][1] is not None
+
+
+def test_invalid_conventions_refuse_verification(bundle, tmp_path, monkeypatch, capsys):
+    b = bundle({"a.md": HEAD + "---\n"})
+    bad = tmp_path / "conv.md"
+    bad.write_text("---\ntype: OKF Conventions\nokf_conventions:\n  verify: { allow_self_verify: maybe }\n---\n")
+    monkeypatch.setattr("sys.argv", ["verify.py", str(b), str(b / "a.md"), "--by", BY, "--at", AT,
+                                     "--conventions", str(bad)])
+    assert verify.main() == 2
+    assert "conventions are invalid" in capsys.readouterr().err

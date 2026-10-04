@@ -55,7 +55,7 @@ jobs:
             perm=$(gh api "repos/$REPO/collaborators/$login/permission" --jq .permission 2>/dev/null || echo none)
             if [ "$perm" = admin ] || [ "$perm" = write ]; then writers="$writers,$login"; fi
           done
-          authors=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].author.login // empty' | sort -u | paste -sd, -)
+          authors=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[] | (.author.login // "?"), (.committer.login // "?")' | sort -u | paste -sd, -)
           echo "WRITERS=$writers" >> "$GITHUB_ENV"
           echo "PR_AUTHORS=$PR_OPENER,$authors" >> "$GITHUB_ENV"
       - name: Lint
@@ -66,7 +66,7 @@ jobs:
           if [ -n "$PR" ]; then
             args+=(--verify-comments "$RUNNER_TEMP/comments.json" --writers "$WRITERS" --pr-authors "$PR_AUTHORS")
           fi
-          uv run -q --no-config --no-project ../okf/skills/okf-knowledge/scripts/lint.py "$BUNDLE" "${args[@]}" --format github
+          uv run -q --no-config --no-project --locked ../okf/skills/okf-knowledge/scripts/lint.py "$BUNDLE" "${args[@]}" --format github
       - name: Check index.md
         working-directory: pr
-        run: uv run -q --no-config --no-project ../okf/skills/okf-knowledge/scripts/index.py "$BUNDLE" --check
+        run: uv run -q --no-config --no-project --locked ../okf/skills/okf-knowledge/scripts/index.py "$BUNDLE" --check

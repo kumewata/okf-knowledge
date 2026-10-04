@@ -70,11 +70,18 @@ jobs:
             echo "head_ref=$head_ref"
             echo "head_sha=$(jq -r .head.sha <<<"$pr")"
           } >> "$GITHUB_OUTPUT"
-          authors=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].author.login // empty' | sort -u | paste -sd, -)
+          authors=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[] | (.author.login // "?"), (.committer.login // "?")' | sort -u | paste -sd, -)
           echo "PR_AUTHORS=$(jq -r .user.login <<<"$pr"),$authors" >> "$GITHUB_ENV"
           gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
-          gh api "repos/$REPO/contents/$BUNDLE/CONVENTIONS.md?ref=$base_ref" --jq .content 2>/dev/null \
-            | base64 -d > "$RUNNER_TEMP/conventions.md" || : > "$RUNNER_TEMP/conventions.md"
+          # The base branch's conventions are the rules. Only a missing file means "use the defaults".
+          if gh api "repos/$REPO/contents/$BUNDLE/CONVENTIONS.md?ref=$base_ref" --jq .content \
+              > "$RUNNER_TEMP/conventions.b64" 2> "$RUNNER_TEMP/conventions.err"; then
+            base64 -d < "$RUNNER_TEMP/conventions.b64" > "$RUNNER_TEMP/conventions.md"
+          elif grep -q "HTTP 404" "$RUNNER_TEMP/conventions.err"; then
+            : > "$RUNNER_TEMP/conventions.md"
+          else
+            reply "could not read the base branch's CONVENTIONS.md; try again later."; exit 1
+          fi
           printf '%s' "$COMMENT_BODY" > "$RUNNER_TEMP/comment.txt"
       - name: Create a GitHub App token
         id: app
@@ -106,7 +113,7 @@ jobs:
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           status=0
-          uv run -q --no-config --no-project skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
+          uv run -q --no-config --no-project --locked skills/okf-knowledge/scripts/verify.py "../pr/$BUNDLE" \
             --comment "$RUNNER_TEMP/comment.txt" --head-sha "$HEAD_SHA" --repo-root ../pr \
             --conventions "$RUNNER_TEMP/conventions.md" --pr-authors "$PR_AUTHORS" \
             --changed "$RUNNER_TEMP/changed.txt" --by "human:$COMMENTER" --at "$CREATED_AT" \

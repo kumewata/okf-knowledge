@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6"]
+# dependencies = ["pyyaml==6.0.3"]
 # ///
 """Append a human verification to concepts of an OKF v0.2 bundle (§5.2).
 
@@ -19,8 +19,10 @@ Options for the workflow:
   --repo-root     resolve paths (and --changed) against this directory
   --conventions   a CONVENTIONS.md to use instead of the bundle's own (the
                   base branch's copy, so a pull request cannot loosen it)
-  --pr-authors    comma-separated logins who opened or committed to the pull
-                  request; refused as verifiers when self-verification is off
+  --pr-authors    comma-separated logins who opened, authored or committed to
+                  the pull request; refused as verifiers when self-verification
+                  is off. `?` stands for a commit linked to no account, and
+                  then refuses every verifier
   --changed       a file listing the pull request's changed paths, one per
                   line; other paths are refused
   --commit        commit the written files as the conventions' bot_git_author
@@ -129,6 +131,9 @@ def plan(repo_root: Path, bundle: Path, paths: list[str], by: str, at: str, conv
     """Validate every path; return [(file, new text or None if already verified)]."""
     if not re.match(conv.data["actors"]["human_pattern"], by):
         raise ValueError(f"--by `{by}` is not a human actor")
+    if not conv.data["verify"]["allow_self_verify"] and "?" in pr_authors:
+        raise ValueError("a commit in the pull request is not linked to a GitHub account, so self-verification "
+                         "cannot be ruled out")
     if by in {f"human:{a}" for a in pr_authors} and not conv.data["verify"]["allow_self_verify"]:
         raise ValueError(f"{by} opened or committed to the pull request, "
                          "and the conventions disallow self-verification")
@@ -221,6 +226,9 @@ def main() -> int:
     try:
         conv_text = _okf.read_text(args.conventions) if args.conventions else None
         conv = _okf.load_conventions(args.bundle, conv_text)
+        if conv.warnings:
+            raise ValueError("the conventions are invalid, so the rules cannot be applied safely: "
+                             + "; ".join(conv.warnings))
         paths = list(args.paths)
         if args.comment:
             if paths:

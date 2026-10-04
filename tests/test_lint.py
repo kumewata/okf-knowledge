@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 import lint
@@ -215,22 +216,69 @@ COMMENT = {"body": "/okf verify @abc1234 a.md\r\nthanks", "user": {"login": "bob
 
 def test_attestations_from_comments():
     a = lint.attestations_from_comments([COMMENT], writers={"bob"}, excluded=set())
-    assert a == [lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}))]
+    assert a == [lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), "abc1234")]
     assert lint.attestations_from_comments([COMMENT], writers={"alice"}, excluded=set()) == []
     assert lint.attestations_from_comments([COMMENT], writers={"bob"}, excluded={"bob"}) == []
     other = {**COMMENT, "body": "LGTM"}
     assert lint.attestations_from_comments([other], writers={"bob"}, excluded=set()) == []
 
 
+def _rev(repo, ref):
+    return subprocess.run(["git", "-C", str(repo), "rev-parse", ref], capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
 def test_okf006_matches_comment_exactly(tmp_path):
     repo = init_repo(tmp_path, {"a.md": BASE})
+    seen = _rev(repo, "HEAD")[:7]  # the head the reviewer commented on
     commit(repo, "a.md", VERIFIED, author="okf-verify[bot]")
-    ok = lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}))
+    ok = lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), seen)
     assert lint.lint(repo, base="main", attestations=[ok]) == []
-    for bad in (lint.Attestation("human:bob", "2026-06-02T00:00:01Z", frozenset({"a.md"})),
-                lint.Attestation("human:eve", "2026-06-02T00:00:00Z", frozenset({"a.md"})),
-                lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"b.md"}))):
+    for bad in (lint.Attestation("human:bob", "2026-06-02T00:00:01Z", frozenset({"a.md"}), seen),
+                lint.Attestation("human:eve", "2026-06-02T00:00:00Z", frozenset({"a.md"}), seen),
+                lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"b.md"}), seen),
+                lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), None),
+                lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), "deadbee")):
         assert rules(lint.lint(repo, base="main", attestations=[bad])) == ["OKF006"]
+
+
+def test_okf006_comment_sha_must_show_the_current_content(tmp_path):
+    repo = init_repo(tmp_path, {"a.md": BASE})
+    old = _rev(repo, "HEAD")[:7]
+    commit(repo, "a.md", BASE.replace("body", "changed body").replace("06-01T", "06-03T"), author="alice")
+    # A writer commented on the old head; someone adds the line by hand on top of the changed content.
+    with_line = (repo / "a.md").read_text().replace(
+        "---\nchanged", "verified:\n  - { by: human:bob, at: 2026-06-02T00:00:00Z }\n---\nchanged")
+    commit(repo, "a.md", with_line, author="okf-verify[bot]")
+    stale = lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), old)
+    assert "OKF006" in rules(lint.lint(repo, base="main", attestations=[stale]), "error")
+
+
+def test_okf006_without_sha_when_not_required(tmp_path):
+    loose = "---\ntype: OKF Conventions\nokf_conventions:\n  verify: { require_sha: false }\n---\n"
+    repo = init_repo(tmp_path, {"a.md": BASE, "CONVENTIONS.md": loose})
+    commit(repo, "a.md", VERIFIED, author="okf-verify[bot]")
+    a = lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), None)
+    assert lint.lint(repo, base="main", attestations=[a]) == []
+
+
+REQUIRED = "---\ntype: OKF Conventions\nokf_conventions:\n  types:\n    Note: { require_human_verified: true }\n---\n"
+
+
+def test_okf008_content_changed_in_pr_needs_a_new_verification(tmp_path):
+    repo = init_repo(tmp_path, {"a.md": VERIFIED, "CONVENTIONS.md": REQUIRED})
+    # Keep generated.at, so the old verification still looks current to the per-file check.
+    commit(repo, "a.md", VERIFIED.replace("body", "rewritten body"), author="alice")
+    found = {(f.rule, f.level) for f in lint.lint(repo, base="main")}
+    assert ("OKF008", "error") in found
+
+
+def test_okf008_satisfied_by_a_verification_added_in_the_pr(tmp_path):
+    repo = init_repo(tmp_path, {"a.md": BASE, "CONVENTIONS.md": REQUIRED})
+    seen = _rev(repo, "HEAD")[:7]
+    commit(repo, "a.md", VERIFIED, author="okf-verify[bot]")
+    ok = lint.Attestation("human:bob", "2026-06-02T00:00:00Z", frozenset({"a.md"}), seen)
+    assert lint.lint(repo, base="main", attestations=[ok]) == []
 
 
 def test_conventions_from_base_ignore_pr_changes(tmp_path):
@@ -289,3 +337,38 @@ def test_lint_strict_rejects_unknown_rules(bundle):
     conv = "---\ntype: OKF Conventions\nokf_conventions:\n  lint: { strict: [OKF999] }\n---\n"
     found = lint.lint(bundle({"CONVENTIONS.md": conv}))
     assert [(f.rule, f.level) for f in found] == [("CONV", "warning")]
+
+
+def test_okf001_type_must_be_a_string(bundle):
+    for value in ("123", "true", "[Note]"):
+        b = bundle({"a.md": f"---\ntype: {value}\n---\n"})
+        assert rules(lint.lint(b), "error") == ["OKF001"], value
+
+
+def test_github_annotation_escapes_newlines(bundle, monkeypatch, capsys):
+    b = bundle({"a.md": "---\ntype: \"Bad\\n::error::forged\"\n---\n"})
+    monkeypatch.setattr("sys.argv", ["lint.py", str(b), "--format", "github"])
+    lint.main()
+    out = capsys.readouterr().out.splitlines()
+    assert len(out) == 1 and "%0A" in out[0] and out[0].startswith("::warning ")
+
+
+def test_missing_bundle_exits_2(tmp_path, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["lint.py", str(tmp_path / "nonexistent")])
+    assert lint.main() == 2
+
+
+def test_unlinked_commit_voids_all_attestations_when_self_verify_is_off(tmp_path, monkeypatch, capsys):
+    strict = "---\ntype: OKF Conventions\nokf_conventions:\n  verify: { allow_self_verify: false }\n---\n"
+    repo = init_repo(tmp_path, {"a.md": BASE, "CONVENTIONS.md": strict})
+    seen = _rev(repo, "HEAD")[:7]
+    commit(repo, "a.md", VERIFIED, author="okf-verify[bot]")
+    comments = tmp_path / "comments.json"
+    comments.write_text(json.dumps([{"body": f"/okf verify @{seen} a.md", "user": {"login": "bob"},
+                                     "created_at": "2026-06-02T00:00:00Z"}]))
+    base = ["lint.py", str(repo), "--base", "main", "--verify-comments", str(comments), "--writers", "bob"]
+    monkeypatch.setattr("sys.argv", base + ["--pr-authors", "alice"])
+    assert lint.main() == 0
+    monkeypatch.setattr("sys.argv", base + ["--pr-authors", "alice,?"])
+    assert lint.main() == 1
+    assert "OKF006" in capsys.readouterr().out

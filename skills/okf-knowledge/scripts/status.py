@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6"]
+# dependencies = ["pyyaml==6.0.3"]
 # ///
 """List the concepts of an OKF v0.2 bundle that need attention.
 

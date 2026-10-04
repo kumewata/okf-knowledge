@@ -53,7 +53,7 @@ okf-status の job には、それぞれ別の `label` を付けます。
 `/okf verify` のコメントには、1 つの bundle のパスだけを書いてください。
 
 コピーしたワークフローは、このリポジトリの再利用ワークフローを呼びます。
-再利用ワークフローはスクリプトを自分と同じコミットで checkout するので、`@v1.0.4` と指定すれば両方が固定されます。
+再利用ワークフローはスクリプトを自分と同じコミットで checkout するので、`@v1.0.5` と指定すれば両方が固定されます。
 リリースタグ（`v1.0.0`、`v1.0.1` など）は一度付けたら動かさず、修正は新しいタグで出します。
 `v1` タグは使わないでください。既知の不具合があるリリース前のコミットを指しています。
 
@@ -66,12 +66,18 @@ lint が検査するのは PR で追加された差分なので、守れるの�
   `human:` の行や規約の変更が、PR を通らずに直接 push されるのを防ぎます。
 - **ステータスチェックの成功を必須にし、okf-lint の各 job を指定する。**
   チェック名は `<呼び出し側の job 名> / lint` で、たとえば `okf-lint / lint` です（2 つ目の bundle があれば `okf-lint-ops / lint` なども）。
-- **Code Owners のレビューを必須にし、各 bundle の規約を `CODEOWNERS` に登録する。**
+- **Code Owners のレビューを必須にし、各 bundle の規約とワークフローを `CODEOWNERS` に登録する。**
   lint と verify が従う規則を、オーナーの承認なしに変えられないようにします。
 
   ```
   /knowledge/CONVENTIONS.md @your-org/knowledge-owners
+  /.github/workflows/ @your-org/knowledge-owners
   ```
+
+  `pull_request` のワークフローは PR 側の定義で動きます。
+  そのため、これがないと PR が自分の okf-lint の呼び出しを書き換えて（たとえば `bundle` を別の場所に向けて）、必須チェックを通せてしまいます。
+  organization では、ステータスチェックではなく okf-lint のワークフロー自体を ruleset で必須にする方法もあります。
+  詳しくは、ruleset でワークフローを必須にする方法についての GitHub の文書を参照してください。
 
 okf-lint を必須にして GitHub App を使わない場合、`/okf verify` のたびに、bot のコミットに対する lint の実行をメンテナーが承認する必要があります（後述）。
 
@@ -110,6 +116,7 @@ lint は、追加された `human:` の行を、git の作成者名ではなく 
 作成者名は誰でも自由に設定できるからです。
 verify の job は書き込み権限のトークンを持つので、PR のコードを一切実行しません。
 スクリプトと PR を別々のディレクトリに checkout し、uv にはプロジェクトの設定を読ませません。
+実行する外部のコードは PyYAML だけで、バージョンを 1 つに固定し、ハッシュを検査するロックファイル（`scripts/*.py.lock`）からインストールします。
 
 GitHub App を使わない場合、`okf-verify` は `GITHUB_TOKEN` で push します。
 このとき GitHub は、そのコミットに対する lint の再実行を、メンテナーが承認するまで保留します。
@@ -141,6 +148,9 @@ uv run pytest
 actionlint
 claude plugin validate .
 ```
+
+ワークフローは、各スクリプトの依存をロックファイルからインストールします（`uv run --locked`）。
+スクリプトの `dependencies` を変えたら、`uv lock --script skills/okf-knowledge/scripts/<script>.py` でロックファイルを作り直してください。
 
 エージェントの振る舞いは `claude plugin eval` で確認します。
 ケースは `evals/` にあり、それぞれ小さな bundle を用意してから、エージェントが残したファイルを採点します。

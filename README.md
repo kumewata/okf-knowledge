@@ -32,7 +32,7 @@ Ask Claude Code to "set up an OKF knowledge bundle", or by hand:
 `knowledge/` is only the default: put the bundle in any directory and change `paths` and `bundle` in the workflows to match.
 A repository can hold several bundles, each with its own `CONVENTIONS.md`; add one job per bundle to each workflow, list every bundle directory in okf-lint's `paths`, give each okf-status job its own `label`, and name the paths of one bundle per `/okf verify` comment.
 
-The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.4` pins both.
+The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.5` pins both.
 Release tags (`v1.0.0`, `v1.0.1`, …) are never moved; a fix ships as a new tag. Do not use the `v1` tag: it points at a pre-release commit with a known bug.
 
 ## Protect the default branch
@@ -42,11 +42,15 @@ Set up a branch protection rule or ruleset for the default branch:
 
 - **Require a pull request before merging**, so that nobody pushes `human:` entries or convention changes straight to the branch.
 - **Require status checks to pass**, and add each okf-lint job. The check is named `<caller job> / lint`, such as `okf-lint / lint` (and `okf-lint-ops / lint` for a second bundle).
-- **Require review from Code Owners**, with a `CODEOWNERS` entry for each bundle's conventions, so that the rules lint and verify apply cannot change without the owners:
+- **Require review from Code Owners**, with `CODEOWNERS` entries for each bundle's conventions and for the workflows, so that the rules lint and verify apply cannot change without the owners:
 
   ```
   /knowledge/CONVENTIONS.md @your-org/knowledge-owners
+  /.github/workflows/ @your-org/knowledge-owners
   ```
+
+  A `pull_request` workflow runs as the pull request defines it, so without this a pull request could edit its own okf-lint call (for example, point `bundle` elsewhere) and still pass the required check.
+  In an organization, a ruleset that requires the okf-lint workflow itself (rather than its status check) is another way to keep a pull request from replacing it; see GitHub's documentation on requiring workflows with rulesets.
 
 With okf-lint required and no GitHub App, every `/okf verify` also needs a maintainer to approve the lint run on the bot's commit (see below).
 
@@ -73,7 +77,7 @@ It does not handle pull requests from forks yet.
 
 Both workflows read `CONVENTIONS.md` from the base branch, so a pull request cannot loosen its own rules.
 Lint checks each added `human:` entry against the pull request's comments rather than git author names, which anyone can set.
-The verify job holds a write token, so it never runs code from the pull request: the scripts and the pull request are checked out into separate directories, and uv ignores project configuration.
+The verify job holds a write token, so it never runs code from the pull request: the scripts and the pull request are checked out into separate directories, uv ignores project configuration, and the only third-party code it runs is PyYAML, pinned to one version and installed from a hash-checked lock file (`scripts/*.py.lock`).
 
 Without a GitHub App, `okf-verify` pushes with `GITHUB_TOKEN`, and GitHub holds the lint re-run on that commit for a maintainer's approval.
 To avoid that, install a GitHub App with `contents: write` and `pull-requests: write` and pass its ID and private key as the secrets `OKF_APP_ID` and `OKF_APP_PRIVATE_KEY` (see the template).
@@ -102,6 +106,8 @@ uv run pytest
 actionlint
 claude plugin validate .
 ```
+
+The workflows install each script's dependencies from its lock file (`uv run --locked`). After changing a script's `dependencies`, regenerate the lock with `uv lock --script skills/okf-knowledge/scripts/<script>.py`.
 
 The agent's behavior is checked with `claude plugin eval` (cases in `evals/`; each scaffolds a small bundle and grades the files the agent leaves):
 

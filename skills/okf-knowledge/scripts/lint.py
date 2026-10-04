@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6"]
+# dependencies = ["pyyaml==6.0.3"]
 # ///
 """Check an OKF v0.2 bundle against the spec and the team's conventions.
 
@@ -47,8 +47,8 @@ def check_concept(c: _okf.Concept, bundle: Path, conv: _okf.Conventions) -> list
     if c.error:
         add("OKF001", "error", c.error)
         return out
-    if not c.type:
-        add("OKF001", "error", "frontmatter has no non-empty `type` (§11)")
+    if not isinstance(c.frontmatter.get("type"), str) or not c.type.strip():
+        add("OKF001", "error", "frontmatter has no non-empty string `type` (§4.1, §11)")
         return out
     fm = c.frontmatter
 
@@ -187,6 +187,7 @@ class Attestation:
     by: str
     at: str
     paths: frozenset[str]
+    sha: str | None = None
 
 
 def attestations_from_comments(comments: list[dict], writers: set[str], excluded: set[str]) -> list[Attestation]:
@@ -197,7 +198,7 @@ def attestations_from_comments(comments: list[dict], writers: set[str], excluded
         login = str((c.get("user") or {}).get("login") or "")
         if parsed is None or login not in writers or login in excluded:
             continue
-        out.append(Attestation(f"human:{login}", str(c.get("created_at")), frozenset(parsed[1])))
+        out.append(Attestation(f"human:{login}", str(c.get("created_at")), frozenset(parsed[1]), parsed[0]))
     return out
 
 
@@ -215,6 +216,7 @@ def check_history(bundle: Path, base: str, conv: _okf.Conventions,
     merge_base = git(root, "merge-base", base, "HEAD").strip()
     out: list[Finding] = []
     added_by_path: dict[str, set[tuple[str, str]]] = {}
+    changed_required: list[str] = []
 
     changes = name_status(git(root, "diff", "-z", "--name-status", "-M", merge_base, "HEAD", "--", rel_bundle))
     for status, old_rel, new_rel in changes:
@@ -236,17 +238,56 @@ def check_history(bundle: Path, base: str, conv: _okf.Conventions,
             if content_changed and _generated_at(old) == _generated_at(new):
                 out.append(Finding("OKF011", "warning", root / new_rel,
                                    "content changed but generated.at did not; update generated.by/at"))
+        rule = conv.type_rule(str(new.get("type") or ""))
+        if rule and rule["require_human_verified"] and (
+                not old_known or _unverified_part(old, old_body) != _unverified_part(new, new_body)):
+            changed_required.append(new_rel)
+
+    # OKF008: a required type whose content changed here needs a verification added here.
+    for rel in changed_required:
+        if not added_by_path.get(rel):
+            out.append(Finding("OKF008", "error", root / rel,
+                               "content changed in this pull request; ask for `/okf verify` again"))
 
     if attestations is not None:
+        require_sha = conv.data["verify"]["require_sha"]
         for rel, added in sorted(added_by_path.items()):
             for by, at in sorted(added):
-                if not any(a.by == by and a.at == at and rel in a.paths for a in attestations):
-                    out.append(Finding("OKF006", "error", root / rel,
-                                       f"verification `{by}` at {at} matches no `/okf verify` comment "
-                                       f"by a writer that lists {rel}"))
+                problem = _match_attestation(root, rel, by, at, attestations, require_sha)
+                if problem:
+                    out.append(Finding("OKF006", "error", root / rel, problem))
     elif added_by_path:
         out += _check_authors(root, base, rel_bundle, conv, added_by_path)
     return out
+
+
+def _unverified_part(fm: dict, body: str) -> tuple:
+    """What a verification covers: everything but `verified` itself."""
+    return ({k: v for k, v in fm.items() if k != "verified"}, body)
+
+
+def _match_attestation(root: Path, rel: str, by: str, at: str, attestations: list[Attestation],
+                       require_sha: bool) -> str | None:
+    """None when a comment backs this verification of the content at HEAD, else the reason it does not."""
+    candidates = [a for a in attestations if a.by == by and a.at == at and rel in a.paths]
+    if not candidates:
+        return f"verification `{by}` at {at} matches no `/okf verify` comment by a writer that lists {rel}"
+    head, head_body, _ = version_at(root, "HEAD", rel)
+    for a in candidates:
+        if a.sha is None:
+            if not require_sha:
+                return None
+            continue
+        try:
+            commit = git(root, "rev-parse", "--verify", "-q", f"{a.sha}^{{commit}}").strip()
+            git(root, "merge-base", "--is-ancestor", commit, "HEAD")
+        except GitError:
+            continue
+        seen, seen_body, known = version_at(root, commit, rel)
+        if known and _unverified_part(seen, seen_body) == _unverified_part(head, head_body):
+            return None
+    return (f"verification `{by}` at {at}: the `/okf verify` comment does not name a commit of this "
+            f"pull request whose {rel} matches the current content")
 
 
 def _check_authors(root: Path, base: str, rel_bundle: str, conv: _okf.Conventions,
@@ -302,6 +343,9 @@ def main() -> int:
     ap.add_argument("--pr-authors", default="", help="comma-separated logins of the pull request's authors")
     ap.add_argument("--format", choices=("text", "github"), default="text")
     args = ap.parse_args()
+    if not args.bundle.is_dir():
+        print(f"error: {args.bundle} is not a directory", file=sys.stderr)
+        return 2
 
     try:
         conventions_text = None
@@ -313,8 +357,11 @@ def main() -> int:
         if args.verify_comments:
             conv = _okf.load_conventions(args.bundle, conventions_text)
             excluded = set() if conv.data["verify"]["allow_self_verify"] else _logins(args.pr_authors)
+            writers = _logins(args.writers)
+            if "?" in excluded:  # a commit linked to no account: nobody can be ruled out
+                writers = set()
             comments = json.loads(args.verify_comments.read_text(encoding="utf-8"))
-            attestations = attestations_from_comments(comments, _logins(args.writers), excluded)
+            attestations = attestations_from_comments(comments, writers, excluded)
         findings = lint(args.bundle, args.base, conventions_text, attestations)
     except GitError as e:
         print(f"error: {e}", file=sys.stderr)
@@ -323,12 +370,18 @@ def main() -> int:
     for f in findings:
         rel = os.path.relpath(f.path)
         if args.format == "github":
-            print(f"::{f.level} file={rel},line=1,title={f.rule}::{f.message}")
+            print(f"::{f.level} file={_escape(rel, True)},line=1,title={f.rule}::{_escape(f.message)}")
         else:
             print(f"{f.level.upper():<7} {f.rule} {rel}: {f.message}")
     errors = sum(f.level == "error" for f in findings)
     print(f"{errors} error(s), {len(findings) - errors} warning(s)", file=sys.stderr)
     return 1 if errors else 0
+
+
+def _escape(value: str, prop: bool = False) -> str:
+    """Escape a workflow-command value, so that file content cannot start a new command."""
+    value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return value.replace(":", "%3A").replace(",", "%2C") if prop else value
 
 
 def _logins(csv: str) -> set[str]:

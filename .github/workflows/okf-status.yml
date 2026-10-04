@@ -44,7 +44,7 @@ jobs:
         working-directory: pr
         run: |
           link_prefix="$GITHUB_SERVER_URL/$REPO/blob/$GITHUB_REF_NAME/${BUNDLE%/}/"
-          uv run -q --no-config --no-project ../okf/skills/okf-knowledge/scripts/status.py "$BUNDLE" \
+          uv run -q --no-config --no-project --locked ../okf/skills/okf-knowledge/scripts/status.py "$BUNDLE" \
             --link-prefix "$link_prefix" > "$RUNNER_TEMP/status.md"
           gh label create "$LABEL" --repo "$REPO" --force > /dev/null
           number=$(gh issue list --repo "$REPO" --label "$LABEL" --state open --json number --jq '.[0].number')

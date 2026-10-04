@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6"]
+# dependencies = ["pyyaml==6.0.3"]
 # ///
 """Generate the index.md files of an OKF v0.2 bundle (§8).
 
@@ -76,6 +76,9 @@ def main() -> int:
     ap.add_argument("bundle", type=Path)
     ap.add_argument("--check", action="store_true", help="exit 1 if any index.md is out of date")
     args = ap.parse_args()
+    if not args.bundle.is_dir():
+        print(f"error: {args.bundle} is not a directory", file=sys.stderr)
+        return 2
 
     stale = []
     for path, text in render_indexes(args.bundle).items():
