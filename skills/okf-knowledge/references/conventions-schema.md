@@ -56,7 +56,7 @@ actors:
 | OKF003 | error | A path in frontmatter that is neither a URL nor `/`-rooted (scope descriptors with spaces are skipped) | team rule |
 | OKF004 | warning | A `/`-rooted path whose target is not in the bundle | §6.1 tolerates broken links |
 | OKF005 | error / warning | An actor matching no pattern; a warning for `sources[].author` | §7, team rule |
-| OKF006 | error | A `human:` verification added since `--base` matches no `/okf verify` comment by a writer that lists the file (with `--verify-comments`, as in CI); without it, a commit by anyone but `bot_git_author` added it | team rule |
+| OKF006 | error | A verification added since `--base` that okf-verify did not record: a `human:` entry matching no `/okf verify` comment by a writer that lists the file and names a commit with the same content (with `--verify-comments`, as in CI; without it, a commit by anyone but `bot_git_author` added it), or any non-`human:` entry such as `process:` | team rule |
 | OKF007 | warning | `generated.at` is newer than the latest `verified[].at` | §5.2 |
 | OKF008 | error | A type with `require_human_verified` lacks a `human:` verification of its current content | team rule |
 | OKF009 | per `unknown_type` | A type outside the vocabulary | team rule |

@@ -166,6 +166,12 @@ def version_at(root: Path, rev: str, rel: str | None) -> tuple[dict | None, str,
     return fm, body, fm is not None
 
 
+def other_verifications(fm: dict | None) -> set[tuple[str, str]]:
+    """Verification events by anything but a `human:` actor (machine checks, typos)."""
+    return {(str(e.get("by")), str(e.get("at"))) for e in _okf.normalize_verified(fm or {})
+            if not str(e.get("by") or "").startswith("human:")}
+
+
 def human_verifications(fm: dict | None) -> set[tuple[str, str]]:
     return {(str(e.get("by")), str(e.get("at"))) for e in _okf.normalize_verified(fm or {})
             if str(e.get("by") or "").startswith("human:")}
@@ -226,6 +232,11 @@ def check_history(bundle: Path, base: str, conv: _okf.Conventions,
         new, new_body, new_known = version_at(root, "HEAD", new_rel)
         if not new_known:
             continue  # OKF001 reports it
+        # No workflow records machine checks yet, so a non-human verification added here is unbacked.
+        for by, at in sorted(other_verifications(new) - other_verifications(old) if old_known else set()):
+            out.append(Finding("OKF006", "error", root / new_rel,
+                               f"verification `{by}` at {at} was added by hand; only `human:` verifications "
+                               "recorded by okf-verify are accepted"))
         added = human_verifications(new) - human_verifications(old)
         if added and not old_known:
             out.append(Finding("OKF006", "warning", root / new_rel,

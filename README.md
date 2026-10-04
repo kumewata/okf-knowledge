@@ -8,7 +8,7 @@ OKF stores knowledge as markdown files with YAML frontmatter.
 Version 0.2 adds frontmatter for who wrote a concept (`generated`), who checked it (`verified`), whether it is current (`status`), and when it expires (`stale_after`).
 This plugin makes those fields mean what they say:
 
-- **Agents write, people verify.** Claude Code records itself in `generated` and never writes a `human:` entry into `verified`. A person verifies by commenting `/okf verify @<sha> <path>` on the pull request; a workflow records it. CI rejects any `human:` entry that does not match such a comment by someone with write access.
+- **Agents write, people verify.** Claude Code records itself in `generated` and never writes a `human:` entry into `verified`. A person verifies by commenting `/okf verify @<sha> <path>` on the pull request; a workflow records it. CI rejects any `human:` entry that does not match such a comment by someone with write access, and any other verification added by hand (machine checks such as `process:` entries have no workflow yet).
 - **The spec's open questions are closed by team rules.** OKF v0.2 leaves the base of relative paths and the set of actor forms open, and a date-only `stale_after` silently never expires. `CONVENTIONS.md` pins these down, and lint enforces them.
 - **Knowledge goes stale on schedule.** A weekly issue lists stale, deprecated, unverified and changed-since-verification concepts.
 
@@ -32,7 +32,7 @@ Ask Claude Code to "set up an OKF knowledge bundle", or by hand:
 `knowledge/` is only the default: put the bundle in any directory and change `paths` and `bundle` in the workflows to match.
 A repository can hold several bundles, each with its own `CONVENTIONS.md`; add one job per bundle to each workflow, list every bundle directory in okf-lint's `paths`, give each okf-status job its own `label`, and name the paths of one bundle per `/okf verify` comment.
 
-The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.5` pins both.
+The workflows call this repository's reusable workflows, which check out the scripts at the same commit, so `@v1.0.6` pins both.
 Release tags (`v1.0.0`, `v1.0.1`, …) are never moved; a fix ships as a new tag. Do not use the `v1` tag: it points at a pre-release commit with a known bug.
 
 ## Protect the default branch

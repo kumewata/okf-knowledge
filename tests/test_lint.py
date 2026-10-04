@@ -372,3 +372,19 @@ def test_unlinked_commit_voids_all_attestations_when_self_verify_is_off(tmp_path
     monkeypatch.setattr("sys.argv", base + ["--pr-authors", "alice,?"])
     assert lint.main() == 1
     assert "OKF006" in capsys.readouterr().out
+
+
+def test_okf006_rejects_hand_added_process_verification(tmp_path):
+    repo = init_repo(tmp_path, {"a.md": BASE})
+    machine = BASE.replace("---\nbody", "verified:\n  - { by: process:nightly, at: 2026-06-02T00:00:00Z }\n---\nbody")
+    commit(repo, "a.md", machine, author="okf-verify[bot]")
+    for attestations in (None, []):
+        found = [f for f in lint.lint(repo, base="main", attestations=attestations) if f.rule == "OKF006"]
+        assert len(found) == 1 and "process:nightly" in found[0].message
+
+
+def test_okf006_keeps_existing_process_verification(tmp_path):
+    machine = BASE.replace("---\nbody", "verified:\n  - { by: process:nightly, at: 2026-06-02T00:00:00Z }\n---\nbody")
+    repo = init_repo(tmp_path, {"a.md": machine})
+    commit(repo, "a.md", machine.replace("body", "new body").replace("06-01T", "06-03T"), author="alice")
+    assert "OKF006" not in rules(lint.lint(repo, base="main", attestations=[]))

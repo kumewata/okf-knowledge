@@ -22,7 +22,7 @@ If there is no bundle and the user wants one, see "Set up a bundle".
 
 ## Rules
 
-1. **Never add a `human:` entry to `verified`.** Only the okf-verify workflow writes those, from a person's `/okf verify` comment, and CI rejects any entry that does not match such a comment (OKF006). You may not verify on a person's behalf, even if asked; tell them how to do it instead.
+1. **Never add anything to `verified`.** Only the okf-verify workflow writes there, recording a person's `/okf verify` comment as `human:<id>`, and CI rejects any `human:` entry that does not match such a comment and any other entry added by hand, such as `process:` (OKF006). You may not verify on a person's behalf, even if asked; tell them how to do it instead.
 2. When you create or change a concept's content, set `generated: { by: claude-code/<your model ID>, at: <now> }`. Leave `generated` alone when you change nothing but `verified`.
 3. Every timestamp is an ISO 8601 datetime with an offset. Get the current time with `date -u +%Y-%m-%dT%H:%M:%SZ`.
 4. Set `stale_after` on every new concept: now plus the type's `stale_after_days`. Compute it with the command below before writing the file; do not type the date by hand.

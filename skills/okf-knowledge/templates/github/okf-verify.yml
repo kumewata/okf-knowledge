@@ -14,7 +14,7 @@ jobs:
   okf-verify:
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/okf verify')
     # Release tags never move. For the strongest pin, use the tag's commit SHA.
-    uses: kumewata/okf-knowledge/.github/workflows/okf-verify.yml@v1.0.5
+    uses: kumewata/okf-knowledge/.github/workflows/okf-verify.yml@v1.0.6
     permissions:
       contents: write
       pull-requests: write
