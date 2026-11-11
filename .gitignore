@@ -3,3 +3,11 @@ __pycache__/
 .venv/
 *.pyc
 evals/results/
+
+# Local agent state and secrets. A machine-global gitignore does not apply on other machines.
+.claude/settings.local.json
+.claude/*.local.*
+.specstory/
+.env
+.env.*
+!.env.example
